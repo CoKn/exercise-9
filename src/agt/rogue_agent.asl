@@ -6,6 +6,7 @@ received_readings([]).
 
 /* Initial goals */
 !set_up_plans. // the agent has the goal to add pro-rogue plans
+!send_witness_reputation.
 
 /* 
  * Plan for reacting to the addition of the goal !set_up_plans
@@ -45,6 +46,16 @@ received_readings([]).
                     }
             });
     .
+
+// Plan to send biased witness reputation ratings
++!send_witness_reputation
+    :  true
+    <-  .print("Sending biased witness reputation ratings.");
+        // Favor the rogue leader and discredit honest agents
+        .send(acting_agent, tell, witness_reputation(self, sensing_agent_9, temperature(-2), 1));
+        .send(acting_agent, tell, witness_reputation(self, sensing_agent_1, temperature(11.8), -0.5))
+    .
+
 
 /* Import behavior of sensing agent */
 { include("sensing_agent.asl")}

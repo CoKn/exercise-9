@@ -19,6 +19,7 @@ robot_td("https://raw.githubusercontent.com/Interactions-HSG/example-tds/main/td
 +!start
     :  true
     <-  .print("Hello world");
+    !send_witness_reputation
     .
 
 /* 
@@ -43,13 +44,20 @@ robot_td("https://raw.githubusercontent.com/Interactions-HSG/example-tds/main/td
  * Triggering event: addition of belief available_role(Role)
  * Context: true (the plan is always applicable)
  * Body: adopts the role Role
-*/
+
 @available_role_plan
 +available_role(Role)
-    :  true
+    : true
     <-  .print("Adopting the role of ", Role);
         adoptRole(Role);
     .
+*/
++available_role(Role)
+    :  (playing_role(temperature_manifestor) & Role == temperature_reader)
+    |  (playing_role(temperature_reader) & Role == temperature_manifestor)
+    <-  .print("Skipping adoption of incompatible role: ", Role).
+
+
 
 /* 
  * Plan for reacting to the addition of the belief interaction_trust(TargetAgent, SourceAgent, MessageContent, ITRating)
@@ -145,7 +153,8 @@ robot_td("https://raw.githubusercontent.com/Interactions-HSG/example-tds/main/td
     <-  .print("Requesting certified reputation ratings from all sensing agents.");
         .broadcast(ask, certified_reputation(_, _, _, _)).
 
-// Plan to process certified reputation ratings and select the best temperature reading
+// Plan to process certified reputation ratings and select the best temperature reading (TASK 1,2, 3)
+/*
 +!select_temperature_reading
     :  true
     <-  .print("Selecting the best temperature reading based on IT_CR ratings.");
@@ -187,6 +196,71 @@ robot_td("https://raw.githubusercontent.com/Interactions-HSG/example-tds/main/td
 
         // Manifest the selected temperature
         !manifest_temperature(SelectedTemp).
+        .
+*/
+
+// Plan to process witness reputation ratings and select the best temperature reading TASK 4
++!select_temperature_reading
+    :  true
+    <-  .print("Selecting the best temperature reading based on IT_CR_WR ratings.");
+        // Collect all interaction trust ratings
+        .findall(ITRating, interaction_trust(_, Agent, _, ITRating), InteractionTrustRatings);
+        .print("Interaction Trust Ratings: ", InteractionTrustRatings);
+
+        // Collect all certified reputation ratings
+        .findall(CRRating, certified_reputation(_, Agent, _, CRRating), CertifiedReputationRatings);
+        .print("Certified Reputation Ratings: ", CertifiedReputationRatings);
+
+        // Collect all witness reputation ratings
+        .findall(WRRating, witness_reputation(_, Agent, _, WRRating), WitnessReputationRatings);
+        .print("Witness Reputation Ratings: ", WitnessReputationRatings);
+
+        // Combine IT, CR, and WR ratings to calculate IT_CR_WR
+        .findall(Agent, interaction_trust(_, Agent, _, _), Agents);
+        .remove_duplicates(Agents, UniqueAgents);
+        BestAgent = null;
+        HighestIT_CR_WR = -1;
+        for (.member(Agent, UniqueAgents)) {
+            // Calculate IT_AVG
+            .findall(ITRating, interaction_trust(_, Agent, _, ITRating), AgentITRatings);
+            .sum(AgentITRatings, TotalIT);
+            .length(AgentITRatings, CountIT);
+            IT_AVG = TotalIT / CountIT;
+
+            // Get CRRating
+            .findall(CRRating, certified_reputation(_, Agent, _, CRRating), AgentCRRatings);
+            .nth(0, AgentCRRatings, CRRating); 
+
+            // Calculate WR_AVG
+            .findall(WRRating, witness_reputation(_, Agent, _, WRRating), AgentWRRatings);
+            .sum(AgentWRRatings, TotalWR);
+            .length(AgentWRRatings, CountWR);
+            WR_AVG = TotalWR / CountWR;
+
+            // Calculate IT_CR_WR
+            IT_CR_WR = (1/3) * IT_AVG + (1/3) * CRRating + (1/3) * WR_AVG;
+            .print("Agent: ", Agent, " IT_CR_WR: ", IT_CR_WR);
+
+            if (IT_CR_WR > HighestIT_CR_WR) {
+                HighestIT_CR_WR = IT_CR_WR;
+                BestAgent = Agent;
+            }
+        };
+
+        .print("Best agent based on IT_CR_WR: ", BestAgent);
+        .findall(Temp, interaction_trust(_, BestAgent, temperature(Temp), _), BestAgentTemps);
+        .nth(0, BestAgentTemps, SelectedTemp);
+        .print("Selected temperature: ", SelectedTemp);
+
+        // Manifest the selected temperature
+        !manifest_temperature(SelectedTemp).
+
+
+// Plan to request witness reputation ratings from all sensing agents
++!request_witness_reputation
+    :  true
+    <-  .print("Requesting witness reputation ratings from all sensing agents.");
+        .broadcast(ask, witness_reputation(_, _, _, _)).
 
 /* 
  * Plan for reacting to the addition of the goal !manifest_temperature
@@ -216,6 +290,18 @@ robot_td("https://raw.githubusercontent.com/Interactions-HSG/example-tds/main/td
         // invokes the action onto:SetWristAngle for manifesting the temperature with the wrist of the robotic arm
         invokeAction("https://ci.mines-stetienne.fr/kg/ontology#SetWristAngle", ["https://www.w3.org/2019/wot/json-schema#IntegerSchema"], [Degrees])[artifact_id(Leubot1Id)];
     .
+
+
+// Plan to send biased witness reputation ratings
++!send_witness_reputation
+    :  true
+    <-  .print("Sending biased witness reputation ratings.");
+        // Favor the rogue leader and discredit honest agents
+        .send(acting_agent, tell, witness_reputation(self, sensing_agent_9, temperature(-2), 1));
+        .send(acting_agent, tell, witness_reputation(self, sensing_agent_1, temperature(11.8), -0.5))
+    .
+
+
 
 /* Import behavior of agents that work in CArtAgO environments */
 { include("$jacamoJar/templates/common-cartago.asl") }

@@ -1,5 +1,3 @@
-// sensing agent
-
 /* Initial beliefs and rules */
 
 // infers whether there is a mission for which goal G has to be achieved by an agent with role R
@@ -24,6 +22,7 @@ i_have_plans_for(R) :- not (role_goal(R,G) & not has_plan_for(G)).
 +!start
     :  true
     <-  .print("Hello world");
+    !send_witness_reputation
     .
 
 /* 
@@ -58,6 +57,7 @@ i_have_plans_for(R) :- not (role_goal(R,G) & not has_plan_for(G)).
         focus(OrgId);
         // creates the goal for adopting relevant roles
         !adopt_relevant_roles;
+        
     .
 
 /* 
@@ -96,3 +96,11 @@ i_have_plans_for(R) :- not (role_goal(R,G) & not has_plan_for(G)).
     <-  .print("Received request for certified reputation.");
         // Respond with the certified reputation rating
         .send(sender, tell, certified_reputation(certification_agent, self, temperature(12.1), 0.8)).
+
+
+// Plan to send witness reputation ratings
++!send_witness_reputation
+    :  true
+    <-  .print("Sending witness reputation ratings.");
+        .send(acting_agent, tell, witness_reputation(self, sensing_agent_1, temperature(11.8), 0.9));
+        .send(acting_agent, tell, witness_reputation(self, sensing_agent_9, temperature(-2), -0.9)).// sensing agent

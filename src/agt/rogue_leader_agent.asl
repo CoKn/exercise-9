@@ -28,6 +28,17 @@
             }
         );
     .
+    
+// Plan to send biased witness reputation ratings
++!send_witness_reputation
+    :  true
+    <-  .print("Sending biased witness reputation ratings.");
+        // Favor itself and discredit honest agents
+        .send(acting_agent, tell, witness_reputation(self, sensing_agent_9, temperature(-2), 1));
+        .send(acting_agent, tell, witness_reputation(self, sensing_agent_1, temperature(11.8), -0.9))
+    .
+
+
 
 /* Import behavior of sensing agent */
 { include("sensing_agent.asl")}
