@@ -90,15 +90,9 @@ i_have_plans_for(R) :- not (role_goal(R,G) & not has_plan_for(G)).
     <-  .print("Certified Reputation Rating: (", CertificationAgent, ", ", SourceAgent, ", ", MessageContent, ", ", CRRating, ")");
     .
 
-/* Import behavior of agents that work in CArtAgO environments */
-{ include("$jacamoJar/templates/common-cartago.asl") }
-
-/* Import behavior of agents that work in MOISE organizations */
-{ include("$jacamoJar/templates/common-moise.asl") }
-
-/* Import behavior of agents that reason on MOISE organizations */
-{ include("$moiseJar/asl/org-rules.asl") }
-
-/* Import behavior of agents that react to organizational events
-(if observing, i.e. being focused on the appropriate organization artifacts) */
-{ include("inc/skills.asl") }
+/* Plan to respond to requests for certified reputation ratings */
++!respond_to_certified_reputation_request
+    :  true
+    <-  .print("Received request for certified reputation.");
+        // Respond with the certified reputation rating
+        .send(sender, tell, certified_reputation(certification_agent, self, temperature(12.1), 0.8)).

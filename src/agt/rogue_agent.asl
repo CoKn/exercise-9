@@ -11,7 +11,7 @@ received_readings([]).
  * Plan for reacting to the addition of the goal !set_up_plans
  * Triggering event: addition of goal !set_up_plans
  * Context: true (the plan is always applicable)
- * Body: adds pro-rogue plans for reading the temperature without using a weather station
+ * Body: adds pro-rogue plans for colluding with the rogue leader
 */
 +!set_up_plans
     :  true
@@ -21,36 +21,28 @@ received_readings([]).
         .relevant_plans({ -!read_temperature }, _, LL2);
         .remove_plan(LL2);
 
-        // adds a new plan for reading the temperature that doesn't require contacting the weather station
-        // the agent will pick one of the first three temperature readings that have been broadcasted,
-        // it will slightly change the reading, and broadcast it
+        // adds a new plan for colluding with the rogue leader
         .add_plan({ +!read_temperature
-            :  received_readings(TempReadings) &
-               .length(TempReadings) >=3
+            :  true
             <-  .print("Reading the temperature");
-                //picks one of the 3 first received readings randomly
-                .random([0,1,2], SourceIndex);
-                .reverse(TempReadings, TempReadingsReversed);
-                .print("Received temperature readings: ", TempReadingsReversed);
-                .nth(SourceIndex, TempReadingsReversed, Celsius);
-                // adds a small deviation to the selected temperature reading
-                .random(Deviation);
-                // broadcasts the temperature
-                .print("Read temperature (Celsius): ", Celsius + Deviation);
-                .broadcast(tell, temperature(Celsius + Deviation));
-            });
-
-        // adds plan for reading temperature in case fewer than 3 readings have been received
-        .add_plan({ +!read_temperature
-            :  received_readings(TempReadings) &
-               .length(TempReadings) < 3
-            <-  // waits for 2000 milliseconds and finds all beliefs about received temperature readings
+                // waits for 2000 milliseconds and finds all beliefs about received temperature readings
                 .wait(2000);
-                .findall(TempReading, temperature(TempReading)[source(Ag)], NewTempReadings);
-                // updates the belief about all reaceived temperature readings
-                -+received_readings(NewTempReadings);
-                // tries again to "read" the temperature
-                !read_temperature;
+                .findall(TempReading, temperature(TempReading)[source(Ag)], TempReadings);
+                .print("Received temperature readings: ", TempReadings);
+
+                // filters the temperature reading from the rogue leader
+                .findall(Temp, temperature(Temp)[source(sensing_agent_9)], RogueLeaderReadings);
+                
+                if (RogueLeaderReadings == []) {
+                    .print("No temperature readings received yet.");
+                    .broadcast(tell, temperature(-2));
+                } else {
+                    .nth(0, RogueLeaderReadings, RogueLeaderTemp);
+
+                    // broadcasts the rogue leader's temperature reading
+                    .print("Colluding with rogue leader. Broadcasting temperature: ", RogueLeaderTemp);
+                    .broadcast(tell, temperature(RogueLeaderTemp));
+                    }
             });
     .
 

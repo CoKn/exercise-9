@@ -96,6 +96,98 @@ robot_td("https://raw.githubusercontent.com/Interactions-HSG/example-tds/main/td
     <-  .nth(0, TempReadings, Celsius);
     .
 
+
+/* 
+ * Plan for reacting to the addition of the goal !select_reading(TempReadings, Celsius)
+ * Triggering event: addition of goal !select_reading(TempReadings, Celsius)
+ * Context: true (the plan is always applicable)
+ * Body: selects the temperature reading from the agent with the highest average interaction trust rating
+ */
+@select_reading_task_1_plan
++!select_reading(TempReadings, Celsius)
+    :  true
+    <-  // Find all interaction trust ratings
+        .findall(ITRating, interaction_trust(_, SourceAgent, temperature(Temp), ITRating), RatingsList);
+        
+        // Group ratings by SourceAgent and calculate average trust ratings
+        .findall(SourceAgent, interaction_trust(_, SourceAgent, _, _), AgentsList);
+        .remove_duplicates(AgentsList, UniqueAgents);
+        .print("Unique agents: ", UniqueAgents);
+        
+        // Calculate average trust for each agent
+        HighestTrust = -1;
+        BestAgent = null;
+        for (.member(Agent, UniqueAgents)) {
+            .findall(Rating, interaction_trust(_, Agent, _, Rating), AgentRatings);
+            .sum(AgentRatings, TotalTrust);
+            .length(AgentRatings, Count);
+            AvgTrust = TotalTrust / Count;
+            .print("Agent: ", Agent, " AvgTrust: ", AvgTrust);
+            
+            // Update the agent with the highest trust
+            if (AvgTrust > HighestTrust) {
+                HighestTrust = AvgTrust;
+                BestAgent = Agent;
+            }
+        };
+        
+        .print("Agent with highest trust: ", BestAgent, " Trust: ", HighestTrust);
+        
+        // Select the temperature reading from the agent with the highest trust
+        .findall(Temp, interaction_trust(_, BestAgent, temperature(Temp), _), TempReadingsFromBestAgent);
+        .nth(0, TempReadingsFromBestAgent, Celsius);
+        .print("Selected temperature: ", Celsius);
+    .
+
+// Plan to request certified reputation ratings from all sensing agents
++!request_certified_reputation
+    :  true
+    <-  .print("Requesting certified reputation ratings from all sensing agents.");
+        .broadcast(ask, certified_reputation(_, _, _, _)).
+
+// Plan to process certified reputation ratings and select the best temperature reading
++!select_temperature_reading
+    :  true
+    <-  .print("Selecting the best temperature reading based on IT_CR ratings.");
+        // Collect all interaction trust ratings
+        .findall(ITRating, interaction_trust(_, Agent, _, ITRating), InteractionTrustRatings);
+        .print("Interaction Trust Ratings: ", InteractionTrustRatings);
+
+        // Collect all certified reputation ratings
+        .findall(CRRating, certified_reputation(_, Agent, _, CRRating), CertifiedReputationRatings);
+        .print("Certified Reputation Ratings: ", CertifiedReputationRatings);
+
+        // Combine IT and CR ratings to calculate IT_CR
+        .findall(Agent, interaction_trust(_, Agent, _, _), Agents);
+        .remove_duplicates(Agents, UniqueAgents);
+        BestAgent = null;
+        HighestIT_CR = -1;
+        for (.member(Agent, UniqueAgents)) {
+            .findall(ITRating, interaction_trust(_, Agent, _, ITRating), AgentITRatings);
+            .sum(AgentITRatings, TotalIT);
+            .length(AgentITRatings, CountIT);
+            IT_AVG = TotalIT / CountIT;
+
+            .findall(CRRating, certified_reputation(_, Agent, _, CRRating), AgentCRRatings);
+            .nth(0, AgentCRRatings, CRRating); // Assume one CRRating per agent
+
+            IT_CR = 0.5 * IT_AVG + 0.5 * CRRating;
+            .print("Agent: ", Agent, " IT_CR: ", IT_CR);
+
+            if (IT_CR > HighestIT_CR) {
+                HighestIT_CR = IT_CR;
+                BestAgent = Agent;
+            }
+        };
+
+        .print("Best agent based on IT_CR: ", BestAgent);
+        .findall(Temp, interaction_trust(_, BestAgent, temperature(Temp), _), BestAgentTemps);
+        .nth(0, BestAgentTemps, SelectedTemp);
+        .print("Selected temperature: ", SelectedTemp);
+
+        // Manifest the selected temperature
+        !manifest_temperature(SelectedTemp).
+
 /* 
  * Plan for reacting to the addition of the goal !manifest_temperature
  * Triggering event: addition of goal !manifest_temperature
